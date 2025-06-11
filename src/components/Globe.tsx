@@ -218,10 +218,10 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
       {selectedLocation && (
         <div style={{
           position: 'absolute',
-          bottom: isMobile ? '8px' : '20px', // Adjust position for mobile
+          bottom: isMobile ? '10px' : '20px', // Adjust position for mobile
           left: '50%',
           transform: 'translateX(-50%)',
-          width: isMobile ? '70%' : '300px', // Responsive width
+          width: isMobile ? '90%' : '300px', // Responsive width
           backgroundColor: 'rgba(0, 0, 0, 0.9)',
           color: 'white',
           padding: '15px',
