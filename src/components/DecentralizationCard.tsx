@@ -28,10 +28,10 @@ const DecentralizationCard: React.FC = () => {
   {counterNames.map((name, i) => (
     <div key={i} className="flex flex-col items-center space-y-1">
       <div
-        className="w-4 h-4 bg-cyan-400 rounded-sm animate-pulse"
+        className="w-4 h-4 bg-yellow-600 rounded-full animate-pulse"
         style={{ animationDelay: `${i * 0.1}s` }}
       ></div>
-      <span className="text-xs text-purple-200">{name}</span>
+      <span className="text-xs text-purple-200 font-semibold">{name}</span>
     </div>
   ))}
 </div>
