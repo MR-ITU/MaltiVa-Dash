@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Globe from 'react-globe.gl';
 import * as THREE from 'three';
 import * as topojson from 'topojson-client';
@@ -96,6 +96,22 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
   const globeRef = useRef<any>();
   const isMobile = useMediaQuery({ maxWidth: 768 }); // Detect mobile devices
 
+  // Rotation control refs
+  const rotationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isDraggingRef = useRef(false);
+  const rotationSpeedRef = useRef(0.1); // degrees per frame
+
+  // Blinking animation state
+  const [blinkPhase, setBlinkPhase] = useState(0);
+  
+  useEffect(() => {
+    // Blinking animation for labels
+    const blinkInterval = setInterval(() => {
+      setBlinkPhase(prev => (prev + 1) % 4);
+    }, 800);
+    
+    return () => clearInterval(blinkInterval);
+  }, []);
 
   useEffect(() => {
     fetch('//unpkg.com/world-atlas@2.0.2/land-110m.json')
@@ -133,48 +149,98 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
   const markerDotsData = useMemo(() => locations, []);
   const htmlMarkerLabelsData = useMemo(() => locations, []);
 
-  useEffect(() => {
-    if (globeRef.current && landPolygons.length > 0) {
-      globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 2.2 });
+  // Auto-rotation functions
+  const startAutoRotation = useCallback(() => {
+    if (rotationIntervalRef.current) return;
+    
+    rotationIntervalRef.current = setInterval(() => {
+      if (!isDraggingRef.current && globeRef.current) {
+        const currentPov = globeRef.current.pointOfView();
+        const newLng = (currentPov.lng + rotationSpeedRef.current) % 360;
+        globeRef.current.pointOfView({ ...currentPov, lng: newLng }, 0);
+      }
+    }, 50);
+  }, []);
+
+  const stopAutoRotation = useCallback(() => {
+    if (rotationIntervalRef.current) {
+      clearInterval(rotationIntervalRef.current);
+      rotationIntervalRef.current = null;
     }
-  }, [landPolygons]);
+  }, []);
+
+  // Handle user interactions
+  const handleInteractionStart = useCallback(() => {
+    isDraggingRef.current = true;
+    stopAutoRotation();
+  }, [stopAutoRotation]);
+
+  const handleInteractionEnd = useCallback(() => {
+    isDraggingRef.current = false;
+    // Restart rotation after a delay
+    setTimeout(() => {
+      startAutoRotation();
+    }, 2000);
+  }, [startAutoRotation]);
 
   useEffect(() => {
     if (globeRef.current && landPolygons.length > 0) {
       // Adjust view for mobile devices
       if (isMobile) {
         // Zoomed out view for mobile
-        globeRef.current.pointOfView({ lat: 0, lng: 0, altitude: 3.5 });
+        globeRef.current.pointOfView({ lat: 0, lng: 0, altitude: 4.0 });
       } else {
         // Standard view for desktop
-        globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 2.2 });
+        globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 2.8 });
       }
+      
+      // Start auto rotation after initial load
+      const startTimer = setTimeout(() => {
+        startAutoRotation();
+      }, 2000);
+      
+      return () => {
+        clearTimeout(startTimer);
+        stopAutoRotation();
+      };
     }
-  }, [landPolygons, isMobile]);
+  }, [landPolygons, isMobile, startAutoRotation, stopAutoRotation]);
 
-  // Create a function to generate labels that handles clicks
- const createLabelElement = (d: Location) => {
+  // Create a function to generate labels with blinking effect
+  const createLabelElement = useCallback((d: Location) => {
     const el = document.createElement('div');
     el.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
     el.style.color = 'white';
-    el.style.fontSize = isMobile ? '12px' : '10px'; // Larger text on mobile
+    el.style.fontSize = isMobile ? '12px' : '10px';
     el.style.padding = '4px 8px';
     el.style.borderRadius = '4px';
-    el.style.border = '1px solid rgba(74, 222, 128, 0.3)';
     el.style.whiteSpace = 'nowrap';
     el.style.pointerEvents = 'auto';
     el.style.cursor = 'pointer';
     el.style.transform = 'translate(-50%, calc(-100% - 8px))';
-    el.style.zIndex = '10'; // Ensure labels are above other elements
+    el.style.zIndex = '10';
+    el.style.transition = 'all 0.3s ease';
+    el.style.animation = 'blink 1.5s infinite';
     el.innerHTML = d.name;
+    
+    // Add blinking border effect
+    const blinkColors = [
+      'rgba(74, 222, 128, 0.3)',
+      'rgba(74, 222, 128, 0.6)',
+      'rgba(74, 222, 128, 0.9)',
+      'rgba(74, 222, 128, 0.6)'
+    ];
+    el.style.border = `1px solid ${blinkColors[blinkPhase]}`;
     
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       setSelectedLocation(d);
+      handleInteractionStart();
+      setTimeout(handleInteractionEnd, 2000);
     });
     
     return el;
-  };
+  }, [isMobile, blinkPhase, handleInteractionStart, handleInteractionEnd]);
 
 
   return (
@@ -186,8 +252,19 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      overflow: 'hidden' // Prevent any overflow
+      overflow: 'hidden'
     }}>
+      {/* Blinking animation style */}
+      <style>
+        {`
+          @keyframes blink {
+            0% { box-shadow: 0 0 3px rgba(74, 222, 128, 0.3); }
+            50% { box-shadow: 0 0 8px rgba(74, 222, 128, 0.8); }
+            100% { box-shadow: 0 0 3px rgba(74, 222, 128, 0.3); }
+          }
+        `}
+      </style>
+      
       <Globe
         ref={globeRef}
         backgroundColor="rgba(0,0,0,0)"
@@ -195,7 +272,7 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
         showGlobe={true}
         showAtmosphere={true}
         atmosphereColor="#2a5a8c"
-        atmosphereAltitude={0.25}
+        atmosphereAltitude={0.2}  // Thinner atmosphere for smaller globe
         polygonsData={landPolygons}
         polygonCapMaterial={polygonsMaterial}
         polygonSideColor={() => 'rgba(0,0,0,0)'}
@@ -204,24 +281,31 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
         pointLat="lat"
         pointLng="lng"
         pointAltitude={0.001}
-        pointRadius={isMobile ? 0.018 : 0.012} // Larger points on mobile
+        pointRadius={isMobile ? 0.016 : 0.01}  // Slightly smaller points
         pointColor={() => '#00ff88'}
-        onPointClick={(point: Location) => setSelectedLocation(point)}
+        pointLabel={d => d.name}
+        onPointClick={(point: Location) => {
+          setSelectedLocation(point);
+          handleInteractionStart();
+          setTimeout(handleInteractionEnd, 2000);
+        }}
         htmlElementsData={htmlMarkerLabelsData}
         htmlLat="lat"
         htmlLng="lng"
-        htmlAltitude={0.022}
-        htmlElement={createLabelElement} // Use our custom label creator
+        htmlAltitude={0.018}  // Closer to surface
+        htmlElement={createLabelElement}
+        onGlobeDragStart={handleInteractionStart}
+        onGlobeDragEnd={handleInteractionEnd}
       />
       
       {/* Location Details Modal */}
       {selectedLocation && (
         <div style={{
           position: 'absolute',
-          bottom: isMobile ? '10px' : '20px', // Adjust position for mobile
+          bottom: isMobile ? '10px' : '20px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: isMobile ? '90%' : '300px', // Responsive width
+          width: isMobile ? '90%' : '300px',
           backgroundColor: 'rgba(0, 0, 0, 0.9)',
           color: 'white',
           padding: '15px',
@@ -229,7 +313,8 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
           border: '1px solid rgba(74, 222, 128, 0.3)',
           zIndex: 100,
           backdropFilter: 'blur(5px)',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          animation: 'blink 2s infinite' // Apply blinking to modal too
         }}>
           <div style={{
             display: 'flex',
@@ -239,15 +324,26 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
             borderBottom: '1px solid rgba(255,255,255,0.1)',
             paddingBottom: '8px'
           }}>
-            <h3 style={{ margin: 0 }}>{selectedLocation.name}</h3>
+            <h3 style={{ 
+              margin: 0,
+              fontSize: isMobile ? '16px' : '18px',
+              color: '#4ade80' // Green color for the name
+            }}>
+              {selectedLocation.name}
+            </h3>
             <button 
               onClick={() => setSelectedLocation(null)}
               style={{
                 background: 'none',
                 border: 'none',
                 color: 'white',
-                fontSize: '16px',
-                cursor: 'pointer'
+                fontSize: '20px',
+                cursor: 'pointer',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center'
               }}
             >
               ×
@@ -255,26 +351,31 @@ const InteractiveGlobe: React.FC<InteractiveGlobeProps> = ({
           </div>
           
           {selectedLocation.dcId && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <div style={{ fontWeight: 'bold' }}>Data Center ID</div>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr', 
+              gap: '8px',
+              fontSize: isMobile ? '12px' : '13px'
+            }}>
+              <div style={{ fontWeight: 'bold', color: '#a0aec0' }}>Data Center ID</div>
               <div>{selectedLocation.dcId}</div>
               
-              <div style={{ fontWeight: 'bold' }}>Data Center Owner</div>
+              <div style={{ fontWeight: 'bold', color: '#a0aec0' }}>Data Center Owner</div>
               <div>{selectedLocation.dcOwner}</div>
               
-              <div style={{ fontWeight: 'bold' }}>Replica Nodes</div>
+              <div style={{ fontWeight: 'bold', color: '#a0aec0' }}>Replica Nodes</div>
               <div>{selectedLocation.replicaNodes}</div>
               
-              <div style={{ fontWeight: 'bold' }}>API Boundary Nodes</div>
+              <div style={{ fontWeight: 'bold', color: '#a0aec0' }}>API Boundary Nodes</div>
               <div>{selectedLocation.apiBoundaryNodes}</div>
               
-              <div style={{ fontWeight: 'bold' }}>Total Nodes</div>
+              <div style={{ fontWeight: 'bold', color: '#a0aec0' }}>Total Nodes</div>
               <div>{selectedLocation.totalNodes}</div>
               
-              <div style={{ fontWeight: 'bold' }}>Node Providers</div>
+              <div style={{ fontWeight: 'bold', color: '#a0aec0' }}>Node Providers</div>
               <div>{selectedLocation.nodeProviders}</div>
               
-              <div style={{ fontWeight: 'bold' }}>Subnets</div>
+              <div style={{ fontWeight: 'bold', color: '#a0aec0' }}>Subnets</div>
               <div>{selectedLocation.subnets}</div>
             </div>
           )}

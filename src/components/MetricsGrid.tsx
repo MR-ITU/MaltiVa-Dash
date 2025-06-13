@@ -9,11 +9,14 @@ const MetricsGrid: React.FC = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setGlobalRequests(prev => prev + Math.floor(Math.random() * 10 - 5));
+      // Adjusted global requests to always increase
+      setGlobalRequests(prev => prev + Math.floor(Math.random() * 5) + 1);
+      
+      // Other metrics remain with natural fluctuations
       setLatency(prev => +(prev + (Math.random() * 0.1 - 0.05)).toFixed(2));
       setSuccessRate(prev => +(Math.min(100, Math.max(98.5, prev + (Math.random() * 0.1 - 0.05))).toFixed(2)));
-      setThreatsBlocked(prev => prev + Math.floor(Math.random() * 5 - 2));
-    }, 3000); // every 3 seconds
+      setThreatsBlocked(prev => Math.max(0, prev + Math.floor(Math.random() * 5 - 2)));
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
