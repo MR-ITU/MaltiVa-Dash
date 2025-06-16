@@ -5,7 +5,7 @@ const TransactionCards: React.FC = () => {
   const [totalRequests, setTotalRequests] = useState(1002);
   const [rejectedRequests, setRejectedRequests] = useState(401); // 40% of 1002 ≈ 401
   const [issuedCertificates, setIssuedCertificates] = useState(601); // 60% of 1002 ≈ 601
-  const [queuedRequests, setQueuedRequests] = useState(0);
+  const [queuedRequests, setQueuedRequests] = useState(2);
   
   useEffect(() => {
     // Add new requests to queue every 1-2 minutes
