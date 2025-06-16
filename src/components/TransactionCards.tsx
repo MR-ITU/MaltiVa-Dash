@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 
 const TransactionCards: React.FC = () => {
+  // Initialize with consistent values
   const [totalRequests, setTotalRequests] = useState(1002);
-  const [rejectedRequests, setRejectedRequests] = useState(998);
-  const [issuedCertificates, setIssuedCertificates] = useState(683);
-  const [queuedRequests, setQueuedRequests] = useState(4);
+  const [rejectedRequests, setRejectedRequests] = useState(401); // 40% of 1002 ≈ 401
+  const [issuedCertificates, setIssuedCertificates] = useState(601); // 60% of 1002 ≈ 601
+  const [queuedRequests, setQueuedRequests] = useState(0);
   
   useEffect(() => {
     // Add new requests to queue every 1-2 minutes
     const addInterval = setInterval(() => {
-      const newRequests = Math.floor(Math.random() * 4) + 2; // 2-5 new requests
+      const newRequests = Math.floor(Math.random() * 3) + 2; // 2-4 new requests
       setTotalRequests(prev => prev + newRequests);
       setQueuedRequests(prev => prev + newRequests);
     }, 60000 + Math.random() * 60000); // 60-120 seconds
@@ -19,11 +20,11 @@ const TransactionCards: React.FC = () => {
       setQueuedRequests(prev => {
         if (prev <= 0) return 0;
         
-        // Process 30-50% of current queue (min 1 request)
-        const processCount = Math.max(1, Math.min(prev, Math.floor(prev * (0.3 + Math.random() * 0.2))));
+        // Process 2-4 requests from queue
+        const processCount = Math.min(prev, Math.floor(Math.random() * 3) + 2);
         
-        // Calculate issued vs rejected (70% issued, 30% rejected)
-        const issuedCount = Math.floor(processCount * 0.7);
+        // Calculate issued vs rejected (60% issued, 40% rejected)
+        const issuedCount = Math.floor(processCount * 0.6);
         const rejectedCount = processCount - issuedCount;
         
         // Update counts with slight delay for visual effect
